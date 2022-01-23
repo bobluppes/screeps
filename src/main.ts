@@ -1,54 +1,7 @@
 import { ErrorMapper } from "utils/ErrorMapper";
+import { SpawnManager } from "SpawnManager";
+import { CreepManager } from "CreepManager";
 
-declare global {
-  /*
-    Example types, expand on these or remove them and add your own.
-    Note: Values, properties defined here do no fully *exist* by this type definiton alone.
-          You must also give them an implemention if you would like to use them. (ex. actually setting a `role` property in a Creeps memory)
-
-    Types added in this `global` block are in an ambient, global context. This is needed because `main.ts` is a module file (uses import or export).
-    Interfaces matching on name from @types/screeps will be merged. This is how you can extend the 'built-in' interfaces from @types/screeps.
-  */
-  // Memory extension samples
-  interface Memory {
-    uuid: number;
-    log: any;
-  }
-
-  interface CreepMemory {
-    // role: string;
-    // room: string;
-    working: boolean;
-    source: Id<Source>;
-  }
-
-  // Syntax for adding proprties to `global` (ex "global.log")
-  namespace NodeJS {
-    interface Global {
-      log: any;
-    }
-  }
-}
-
-function get_storage_targets(spawn: StructureSpawn) : Structure<StructureConstant>[] {
-  let target = spawn.room.find(FIND_MY_STRUCTURES, {
-    filter: (i) => (i.structureType == STRUCTURE_SPAWN || i.structureType == STRUCTURE_EXTENSION) && i.store.getFreeCapacity(RESOURCE_ENERGY) > 0
-  });
-
-  return target;
-}
-
-function get_available_sources(spawn: StructureSpawn) : Source[] {
-  let used_sources = new Map();
-  for (const name in Game.creeps) {
-    let creep = Game.creeps[name];
-    used_sources.set(creep.memory.source, true);
-  }
-
-  return spawn.room.find(FIND_SOURCES, {
-    filter: (i) => !used_sources.has(i.id)
-  })
-}
 
 // When compiling TS to JS and bundling with rollup, the line numbers and file names in error messages change
 // This utility uses source maps to get the line numbers and file names of the original, TS source code
@@ -61,57 +14,14 @@ export const loop = ErrorMapper.wrapLoop(() => {
     }
   }
 
-  let spawn = Game.spawns[`Spawn1`];
-  let controller = spawn.room.controller;
-  let construction_sites = spawn.room.find(FIND_CONSTRUCTION_SITES);
-  let storage_targets = get_storage_targets(spawn);
-
-  if (spawn.room.find(FIND_MY_CREEPS).length < 2) {
-    if (spawn.store.getUsedCapacity(RESOURCE_ENERGY) >= 200) {
-      let name = `creep_` + Game.time;
-      let source = get_available_sources(spawn)[0];
-      spawn.spawnCreep([WORK, MOVE, CARRY], name, {memory: {working: false, source: source.id}});
-      console.log(`Spawning ${name}`);
-    }
+  for (const name in Game.spawns) {
+    let spawn = Game.spawns[name];
+    SpawnManager.spawn_creeps(spawn);
   }
 
   for (const name in Game.creeps) {
     let creep = Game.creeps[name];
-
-    if (creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0 && !creep.memory.working) {
-      creep.say(`⚒️ Harvest`);
-      let target = Game.getObjectById(creep.memory.source);
-      if (!target) { // TODO: remove once all creeps have migrated to the new memory structure
-        target = spawn.room.find(FIND_SOURCES)[0];
-      }
-      if (creep.harvest(target) == ERR_NOT_IN_RANGE) {
-        creep.moveTo(target);
-      }
-    } else if (storage_targets.length > 0) {
-      creep.say(`🔶 Dumping`);
-      let target = storage_targets[0];
-      if (creep.transfer(target, RESOURCE_ENERGY) == ERR_NOT_IN_RANGE) {
-        creep.moveTo(target);
-      }
-    } else if (construction_sites.length > 0) {
-      creep.say(`⚒️ Build`);
-      creep.memory.working = true;
-      let target = construction_sites[0];
-      if (creep.build(target) == ERR_NOT_IN_RANGE) {
-        creep.moveTo(target);
-      }
-    } else {
-      creep.say(`⬆️ Upgrade`);
-      creep.memory.working = true;
-      if (controller) {
-        if (creep.upgradeController(controller) == ERR_NOT_IN_RANGE) {
-          creep.moveTo(controller);
-        }
-      }
-    }
-
-    if (creep.store.getUsedCapacity(RESOURCE_ENERGY) == 0) {
-      creep.memory.working = false;
-    }
+    CreepManager.do_work(creep);
   }
+
 });
