@@ -39,7 +39,8 @@ export class SpawnManager {
       for (let y = -1; y <= 1; y++) {
         let adjecent_position = new RoomPosition(pos.x + x, pos.y + y, pos.roomName);
         let terrains = adjecent_position.lookFor(LOOK_TERRAIN);
-        if (terrains.length == 1 && terrains[0] == terrain_plain) {
+        let structures = adjecent_position.lookFor(LOOK_STRUCTURES);
+        if (terrains.length == 1 && terrains[0] == terrain_plain && structures.length == 0) {
           free_spots++;
         }
       }
