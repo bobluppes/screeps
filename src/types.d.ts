@@ -14,7 +14,7 @@ interface Memory {
 }
 
 interface CreepMemory {
-  // role: string;
+  role: Role;
   // room: string;
   working: boolean;
   source: Id<Source>;
@@ -25,4 +25,9 @@ declare namespace NodeJS {
   interface Global {
     log: any;
   }
+}
+
+declare const enum Role {
+  Upgrader,
+  Worker
 }

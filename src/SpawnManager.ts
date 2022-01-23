@@ -13,7 +13,9 @@ class ProposedBody {
 
 export class SpawnManager {
 
-  private static get_available_sources(spawn: StructureSpawn) : Source[] {
+  private static upgrader_target_count = 1;
+
+  private static get_available_sources(spawn: StructureSpawn, role: Role) : Source[] {
     let used_sources = new Map();
     for (const name in Game.creeps) {
       let creep = Game.creeps[name];
@@ -25,9 +27,23 @@ export class SpawnManager {
       }
     }
 
-    return spawn.room.find(FIND_SOURCES, {
+    let sources = spawn.room.find(FIND_SOURCES, {
       filter: (i) => this.free_spots(i.pos) > used_sources.get(i.id) || !used_sources.has(i.id)
-    })
+    });
+
+    // Sort by distance to controller if the new creep role is Upgrader
+    if (role == Role.Upgrader) {
+      sources.sort( (a: Source, b: Source) => {
+        let controller = a.room.controller
+        if (controller) {
+          return a.pos.getRangeTo(controller) - b.pos.getRangeTo(controller);
+        } else {
+          return 0;
+        }
+      });
+    }
+
+    return sources;
   }
 
   private static free_spots(pos: RoomPosition) : number {
@@ -81,12 +97,22 @@ export class SpawnManager {
     let creeps_count = spawn.room.find(FIND_MY_CREEPS).length;
 
     if (creeps_count < total_spots) {
+
+      // Determine role
+      let role = Role.Worker;
+      let upgraders = spawn.room.find(FIND_MY_CREEPS, {
+        filter: (creep) => creep.memory.role == Role.Upgrader
+      });
+      if (upgraders.length < this.upgrader_target_count) {
+        role = Role.Upgrader;
+      }
+
       let body = this.compute_max_body(spawn.room.energyCapacityAvailable);
       if (spawn.room.energyAvailable >= body.cost) {
         let name = `creep_` + Game.time;
-        let source = this.get_available_sources(spawn)[0];
+        let source = this.get_available_sources(spawn, role)[0];
         if (source) {
-          spawn.spawnCreep(body.parts, name, {memory: {working: false, source: source.id}});
+          spawn.spawnCreep(body.parts, name, {memory: {working: false, source: source.id, role: role}});
           console.log(`Spawning ${name} on source: ${source.id}, ${creeps_count}/${total_spots}`);
         }
       }

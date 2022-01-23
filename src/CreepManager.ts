@@ -26,7 +26,7 @@ export class CreepManager {
         throw Error('Creep has no valid source target.');
       }
 
-    } else if (storage_targets.length > 0) {
+    } else if (storage_targets.length > 0 && creep.memory.role != Role.Upgrader) {
 
       creep.say(`🔶 Dumping`);
       let target = storage_targets[0];
@@ -34,7 +34,7 @@ export class CreepManager {
         creep.moveTo(target);
       }
 
-    } else if (construction_sites.length > 0) {
+    } else if (construction_sites.length > 0 && creep.memory.role != Role.Upgrader) {
 
       creep.say(`⚒️ Build`);
       creep.memory.working = true;
