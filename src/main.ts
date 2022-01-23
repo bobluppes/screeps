@@ -19,6 +19,7 @@ declare global {
     // role: string;
     // room: string;
     working: boolean;
+    source: Id<Source>;
   }
 
   // Syntax for adding proprties to `global` (ex "global.log")
@@ -35,6 +36,18 @@ function get_storage_targets(spawn: StructureSpawn) : Structure<StructureConstan
   });
 
   return target;
+}
+
+function get_available_sources(spawn: StructureSpawn) : Source[] {
+  let used_sources = new Map();
+  for (const name in Game.creeps) {
+    let creep = Game.creeps[name];
+    used_sources.set(creep.memory.source, true);
+  }
+
+  return spawn.room.find(FIND_SOURCES, {
+    filter: (i) => !used_sources.has(i.id)
+  })
 }
 
 // When compiling TS to JS and bundling with rollup, the line numbers and file names in error messages change
@@ -54,9 +67,12 @@ export const loop = ErrorMapper.wrapLoop(() => {
   let storage_targets = get_storage_targets(spawn);
 
   if (spawn.room.find(FIND_MY_CREEPS).length < 2) {
-    let name = `creep_` + Game.time;
-    spawn.spawnCreep([WORK, MOVE, CARRY], name, {memory: {working: false}});
-    console.log(`Spawning ${name}`);
+    if (spawn.store.getUsedCapacity(RESOURCE_ENERGY) >= 200) {
+      let name = `creep_` + Game.time;
+      let source = get_available_sources(spawn)[0];
+      spawn.spawnCreep([WORK, MOVE, CARRY], name, {memory: {working: false, source: source.id}});
+      console.log(`Spawning ${name}`);
+    }
   }
 
   for (const name in Game.creeps) {
@@ -64,7 +80,10 @@ export const loop = ErrorMapper.wrapLoop(() => {
 
     if (creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0 && !creep.memory.working) {
       creep.say(`⚒️ Harvest`);
-      let target = creep.room.find(FIND_SOURCES)[0];
+      let target = Game.getObjectById(creep.memory.source);
+      if (!target) { // TODO: remove once all creeps have migrated to the new memory structure
+        target = spawn.room.find(FIND_SOURCES)[0];
+      }
       if (creep.harvest(target) == ERR_NOT_IN_RANGE) {
         creep.moveTo(target);
       }
